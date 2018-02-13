@@ -1,0 +1,44 @@
+spring:
+
+  application:
+    name: Data Returns Data Migration
+
+  main:
+    web-application-type: NONE
+
+#  master-data:
+#    datasource:
+#       url: jdbc:postgresql://poimaster.cqcu8oshua9i.eu-west-1.rds.amazonaws.com:5432/pidec?currentSchema=dr_md_api
+#       username: poimaster
+#       password: poimaster
+#       driverClassName: org.postgresql.Driver
+#  pidec:
+#    datasource:
+#       url: jdbc:postgresql://poimaster.cqcu8oshua9i.eu-west-1.rds.amazonaws.com:5432/pidec?currentSchema=pidec
+#       username: poimaster
+#       password: poimaster
+#       driverClassName: org.postgresql.Driver
+
+  master-data:
+    datasource:
+       url: jdbc:postgresql://localhost:5432/dr_md_api
+       username: data_returns_owner
+       password: data_returns_owner
+       driverClassName: org.postgresql.Driver
+
+  pidec:
+    datasource:
+       url: jdbc:postgresql://localhost:5432/piedc?currentSchema=pidec
+       username: data_returns_owner
+       password: data_returns_owner
+       driverClassName: org.postgresql.Driver
+
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQL95Dialect
+    database: default
+    show-sql: true
+    generate-ddl: false
+    hibernate:
+      ddl-auto: validate
+
+
