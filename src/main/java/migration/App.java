@@ -22,6 +22,7 @@ public class App {
                 final DataMigration migration = context.getBean(DataMigration.class);
                 migration.migrateArea();
                 migration.migrateOperator();
+                migration.asr();
             } catch (final Throwable t) {
                 StringWriter sw = new StringWriter();
                 t.printStackTrace(new PrintWriter(sw));

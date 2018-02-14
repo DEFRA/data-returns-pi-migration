@@ -3,6 +3,8 @@ package migration.migration;
 import com.google.common.base.Strings;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import model.masterdata.eaid.AsrCode;
+import model.masterdata.eaid.AsrCodeRepository;
 import model.masterdata.eaid.Operator;
 import model.masterdata.eaid.OperatorRepository;
 import model.masterdata.geography.Area;
@@ -30,10 +32,13 @@ public class DataMigration {
     @Autowired IsrRegionEntityRepository isrRegionEntityRepository;
     @Autowired IsrAreaEntityRepository isrAreaEntityRepository;
     @Autowired IsrOperatorEntityRepository isrOperatorEntityRepository;
+    @Autowired IsrAsrCodesEntityRepository isrAsrCodesEntityRepository;
+    @Autowired IsrAsrFullCodesEntityRepository isrAsrFullCodesEntityRepository;
 
     @Autowired AreaRepository areaRepository;
     @Autowired RegionRepository regionRepository;
     @Autowired OperatorRepository operatorRepository;
+    @Autowired AsrCodeRepository asrCodeRepository;
 
     private Date timestamp = new Date();
     private Pattern multiSpace = Pattern.compile("\\s+");
@@ -104,5 +109,28 @@ public class DataMigration {
                 }).collect(Collectors.toList());
 
         operatorRepository.save(operators);
+        operatorRepository.flush();
+    }
+
+    public void asr() {
+        log.info("Migrate ASR codes");
+
+        final List<IsrAsrFullCodesEntity> asrFullCodesEntities = isrAsrFullCodesEntityRepository.findAll();
+
+        List<AsrCode> asrCodes = asrFullCodesEntities.stream().map(isrAsrFullCodesEntity -> {
+            AsrCode asrCode = new AsrCode();
+            asrCode.setNomenclature(isrAsrFullCodesEntity.getAsrFullCode());
+            asrCode.setAsrFullCodeDescription(isrAsrFullCodesEntity.getAsrFullCodeDescription());
+            IsrAsrCodesEntity isrAsrCodesByAsrCode = isrAsrFullCodesEntity.getIsrAsrCodesByAsrCode();
+            asrCode.setAsrCode(isrAsrCodesByAsrCode.getAsrCode());
+            asrCode.setAsrCodeDescription(isrAsrCodesByAsrCode.getAsrCodeDescription());
+            asrCode.setCreated(timestamp);
+            asrCode.setLastModified(timestamp);
+            return asrCode;
+        }).collect(Collectors.toList());
+
+        asrCodeRepository.deleteAll();
+        asrCodeRepository.save(asrCodes);
+        asrCodeRepository.flush();
     }
 }
