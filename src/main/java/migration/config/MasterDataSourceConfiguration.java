@@ -9,8 +9,11 @@ import org.springframework.boot.orm.jpa.hibernate.SpringPhysicalNamingStrategy;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
+import org.springframework.orm.jpa.JpaTransactionManager;
 import org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean;
+import org.springframework.transaction.PlatformTransactionManager;
 
+import javax.persistence.EntityManagerFactory;
 import javax.sql.DataSource;
 import java.util.HashMap;
 import java.util.Map;
@@ -18,6 +21,7 @@ import java.util.Map;
 @Configuration
 @EnableJpaRepositories(
         entityManagerFactoryRef = "mdEntityManagerFactory",
+        transactionManagerRef = "mdTransactionManager",
         basePackages = { "model.masterdata" },
         considerNestedRepositories = true
 )
@@ -49,6 +53,13 @@ public class MasterDataSourceConfiguration {
                 .build();
 
         return localContainerEntityManagerFactoryBean;
+    }
+
+    @Bean(name = "mdTransactionManager")
+    public PlatformTransactionManager transactionManager(
+            @Qualifier("mdEntityManagerFactory") EntityManagerFactory entityManagerFactory) {
+
+        return new JpaTransactionManager(entityManagerFactory);
     }
 }
 

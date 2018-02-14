@@ -5,17 +5,17 @@ import javax.persistence.*;
 @Entity
 @Table(name = "isr_region", schema = "piedc", catalog = "piedc")
 public class IsrRegionEntity {
-    private int regionid;
+    private Integer regionid;
     private String regionname;
     private String regionshortname;
 
     @Id
     @Column(name = "regionid", nullable = false, precision = 0)
-    public int getRegionid() {
+    public Integer getRegionid() {
         return regionid;
     }
 
-    public void setRegionid(int regionid) {
+    public void setRegionid(Integer regionid) {
         this.regionid = regionid;
     }
 
@@ -46,7 +46,7 @@ public class IsrRegionEntity {
 
         IsrRegionEntity that = (IsrRegionEntity) o;
 
-        if (regionid != that.regionid) return false;
+        if (regionid != null ? !regionid.equals(that.regionid) : that.regionid != null) return false;
         if (regionname != null ? !regionname.equals(that.regionname) : that.regionname != null) return false;
         if (regionshortname != null ? !regionshortname.equals(that.regionshortname) : that.regionshortname != null)
             return false;
@@ -56,7 +56,7 @@ public class IsrRegionEntity {
 
     @Override
     public int hashCode() {
-        int result = regionid;
+        int result = regionid != null ? regionid.hashCode() : 0;
         result = 31 * result + (regionname != null ? regionname.hashCode() : 0);
         result = 31 * result + (regionshortname != null ? regionshortname.hashCode() : 0);
         return result;

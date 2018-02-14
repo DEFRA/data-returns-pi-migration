@@ -13,13 +13,15 @@ import org.springframework.context.annotation.ComponentScan;
 public class App {
     public static void main(String[] args) {
         final ConfigurableApplicationContext context = SpringApplication.run(App.class, args);
-        log.info("Running data-returns migration");
-        try {
-            final DataMigration migration = context.getBean(DataMigration.class);
-            migration.migrate();
-        } catch (final Throwable t) {
-            System.exit(-1);
+        if (context.getEnvironment().acceptsProfiles("migration")) {
+            log.info("Running data-returns migration");
+            try {
+                final DataMigration migration = context.getBean(DataMigration.class);
+                migration.migrateArea();
+            } catch (final Throwable t) {
+                log.error(t.getMessage());
+                System.exit(-1);
+            }
         }
-
     }
 }

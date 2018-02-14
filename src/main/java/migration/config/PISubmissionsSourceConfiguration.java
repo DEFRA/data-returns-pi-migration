@@ -1,58 +1,65 @@
 package migration.config;
 
+import migration.persistence.DataReturnsImplicitNamingStrategy;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.jdbc.DataSourceBuilder;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.orm.jpa.EntityManagerFactoryBuilder;
+import org.springframework.boot.orm.jpa.hibernate.SpringPhysicalNamingStrategy;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Primary;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
-//import org.springframework.orm.jpa.JpaTransactionManager;
 import org.springframework.orm.jpa.JpaTransactionManager;
 import org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean;
 import org.springframework.transaction.PlatformTransactionManager;
 
 import javax.persistence.EntityManagerFactory;
 import javax.sql.DataSource;
-//import org.springframework.transaction.PlatformTransactionManager;
-//import org.springframework.transaction.annotation.EnableTransactionManagement;
+import java.util.HashMap;
+import java.util.Map;
 
 @Configuration
 @EnableJpaRepositories(
-        basePackages = { "model.pidec" },
+        entityManagerFactoryRef = "sdEntityManagerFactory",
+        transactionManagerRef = "sdTransactionManager",
+        basePackages = { "model.submissions" },
         considerNestedRepositories = true
 )
-public class PidecSourceConfiguration {
+public class PISubmissionsSourceConfiguration {
 
-    @Primary
-    @Bean(name = "dataSource")
-    @ConfigurationProperties(prefix="spring.pidec.datasource")
+    protected Map<String, Object> jpaProperties() {
+        Map<String, Object> props = new HashMap<>();
+        props.put("hibernate.implicit_naming_strategy", DataReturnsImplicitNamingStrategy.class.getName());
+        props.put("hibernate.physical_naming_strategy", SpringPhysicalNamingStrategy.class.getName());
+        return props;
+    }
+
+    @Bean(name = "sdDataSource")
+    @ConfigurationProperties(prefix="spring.submissions.datasource")
     public DataSource getDataSource() {
         return DataSourceBuilder.create().build();
     }
 
-    @Primary
-    @Bean(name = "entityManagerFactory")
+    @Bean(name = "sdEntityManagerFactory")
     public LocalContainerEntityManagerFactoryBean entityManagerFactory(
             EntityManagerFactoryBuilder builder,
-            @Qualifier("dataSource") DataSource dataSource) {
+            @Qualifier("sdDataSource") DataSource dataSource) {
 
         LocalContainerEntityManagerFactoryBean localContainerEntityManagerFactoryBean = builder
                 .dataSource(dataSource)
-                .packages("model.pidec.authorizations")
-                .persistenceUnit("pidec")
+                .packages("model.submissions")
+                .persistenceUnit("sd")
+                .properties(jpaProperties())
                 .build();
 
         return localContainerEntityManagerFactoryBean;
     }
 
-    @Primary
-    @Bean(name = "transactionManager")
+    @Bean(name = "sdTransactionManager")
     public PlatformTransactionManager transactionManager(
-            @Qualifier("mdEntityManagerFactory") EntityManagerFactory entityManagerFactory) {
-
+            @Qualifier("sdEntityManagerFactory") EntityManagerFactory entityManagerFactory) {
         return new JpaTransactionManager(entityManagerFactory);
     }
 
 }
+

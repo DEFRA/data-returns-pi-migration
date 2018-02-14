@@ -26,6 +26,13 @@ spring:
        password: data_returns_owner
        driverClassName: org.postgresql.Driver
 
+  submissions:
+    datasource:
+       url: jdbc:postgresql://localhost:5432/dr_pi_api
+       username: data_returns_owner
+       password: data_returns_owner
+       driverClassName: org.postgresql.Driver
+
   pidec:
     datasource:
        url: jdbc:postgresql://localhost:5432/piedc?currentSchema=pidec
