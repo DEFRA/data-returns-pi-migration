@@ -7,6 +7,9 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.ComponentScan;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
+
 @SpringBootApplication
 @ComponentScan
 @Slf4j
@@ -19,7 +22,9 @@ public class App {
                 final DataMigration migration = context.getBean(DataMigration.class);
                 migration.migrateArea();
             } catch (final Throwable t) {
-                log.error(t.getMessage());
+                StringWriter sw = new StringWriter();
+                t.printStackTrace(new PrintWriter(sw));
+                log.error(sw.toString());
                 System.exit(-1);
             }
         }
