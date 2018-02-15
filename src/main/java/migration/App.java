@@ -22,7 +22,9 @@ public class App {
                 final DataMigration migration = context.getBean(DataMigration.class);
                 migration.migrateArea();
                 migration.migrateOperator();
-                migration.asr();
+                migration.migrateAsr();
+                migration.migrateSite();
+                migration.migratePermits();
             } catch (final Throwable t) {
                 StringWriter sw = new StringWriter();
                 t.printStackTrace(new PrintWriter(sw));

@@ -10,6 +10,9 @@ import model.masterdata.MasterDataEntity;
 import model.masterdata.eaid.UniqueIdentifier;
 import org.hibernate.annotations.GenericGenerator;
 import org.hibernate.id.enhanced.SequenceStyleGenerator;
+
+import javax.persistence.Basic;
+import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.OneToMany;
 import java.util.HashSet;
@@ -33,4 +36,5 @@ public class Site extends AbstractMasterDataEntity implements MasterDataEntity {
     @OneToMany(mappedBy = "site")
     @Setter(AccessLevel.NONE)
     private Set<UniqueIdentifier> uniqueIdentifiers = new HashSet<>();
+
 }

@@ -3,14 +3,13 @@ package migration.migration;
 import com.google.common.base.Strings;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import model.masterdata.eaid.AsrCode;
-import model.masterdata.eaid.AsrCodeRepository;
-import model.masterdata.eaid.Operator;
-import model.masterdata.eaid.OperatorRepository;
+import model.masterdata.eaid.*;
 import model.masterdata.geography.Area;
 import model.masterdata.geography.AreaRepository;
 import model.masterdata.geography.Region;
 import model.masterdata.geography.RegionRepository;
+import model.masterdata.site.Site;
+import model.masterdata.site.SiteRepository;
 import model.pidec.authorizations.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Profile;
@@ -19,6 +18,7 @@ import org.springframework.util.StringUtils;
 
 import java.util.Date;
 import java.util.List;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -34,18 +34,23 @@ public class DataMigration {
     @Autowired IsrOperatorEntityRepository isrOperatorEntityRepository;
     @Autowired IsrAsrCodesEntityRepository isrAsrCodesEntityRepository;
     @Autowired IsrAsrFullCodesEntityRepository isrAsrFullCodesEntityRepository;
+    @Autowired IsrSiteEntityRepository isrSiteEntityRepository;
 
     @Autowired AreaRepository areaRepository;
     @Autowired RegionRepository regionRepository;
     @Autowired OperatorRepository operatorRepository;
     @Autowired AsrCodeRepository asrCodeRepository;
+    @Autowired SiteRepository siteRepository;
+    @Autowired UniqueIdentifierRepository uniqueIdentifierRepository;
+    @Autowired UniqueIdentifierGroupRepository uniqueIdentifierGroupRepository;
 
     private Date timestamp = new Date();
-    private Pattern multiSpace = Pattern.compile("\\s+");
+
+    private static String normalize(String s) {
+        return StringUtils.trimWhitespace(s.toUpperCase()).replaceAll("\\s+", " ");
+    }
 
     public void migrateArea() {
-        log.info("Migrate areas and regions");
-
         areaRepository.deleteAll();
         regionRepository.deleteAll();
 
@@ -64,6 +69,7 @@ public class DataMigration {
             return region;
         }).collect(Collectors.toList());
 
+        log.info("Migrated regions: " + regions.size());
         regionRepository.save(regions);
         regionRepository.flush();
 
@@ -86,19 +92,17 @@ public class DataMigration {
             return area;
         }).collect(Collectors.toList());
 
+        log.info("Migrated areas: " + areas.size());
         areaRepository.save(areas);
         areaRepository.flush();
     }
 
     public void migrateOperator() {
-        log.info("Migrate operators");
-
         operatorRepository.deleteAll();
         List<IsrOperatorEntity> isrOperatorEntities = isrOperatorEntityRepository.findAll();
 
         List<Operator> operators = isrOperatorEntities.stream()
-                .map(isrOperatorEntity -> StringUtils.trimWhitespace(isrOperatorEntity.getOperatorname()
-                        .toUpperCase()).replaceAll("\\s+", " "))
+                .map(isrOperatorEntity -> normalize(isrOperatorEntity.getOperatorname()))
                 .distinct()
                 .map(s -> {
                     Operator operator = new Operator();
@@ -110,11 +114,11 @@ public class DataMigration {
 
         operatorRepository.save(operators);
         operatorRepository.flush();
+
+        log.info("Migrated operators: " + operators.size());
     }
 
-    public void asr() {
-        log.info("Migrate ASR codes");
-
+    public void migrateAsr() {
         final List<IsrAsrFullCodesEntity> asrFullCodesEntities = isrAsrFullCodesEntityRepository.findAll();
 
         List<AsrCode> asrCodes = asrFullCodesEntities.stream().map(isrAsrFullCodesEntity -> {
@@ -132,5 +136,41 @@ public class DataMigration {
         asrCodeRepository.deleteAll();
         asrCodeRepository.save(asrCodes);
         asrCodeRepository.flush();
+
+        log.info("Migrated ASR codes: " + asrCodes.size());
+    }
+
+    public void migrateSite() {
+        List<Site> currentSites = siteRepository.findAll();
+
+        Set<String> currentSitesSet = currentSites.stream()
+                .map(Site::getNomenclature)
+                .map(s -> normalize(s))
+                .collect(Collectors.toSet());
+
+        List<IsrSiteEntity> isrSiteEntities = isrSiteEntityRepository.findAll();
+
+        List<Site> sites = isrSiteEntities.stream()
+                .map(IsrSiteEntity::getSiteaddress)
+                .filter(s -> !Strings.isNullOrEmpty(s))
+                .map(s -> normalize(s))
+                .filter(s -> !currentSitesSet.contains(s))
+                .distinct()
+                .map(s -> {
+                    Site site = new Site();
+                    site.setNomenclature(normalize(s));
+                    site.setCreated(timestamp);
+                    site.setLastModified(timestamp);
+                    return site;
+                }).collect(Collectors.toList());
+
+        siteRepository.save(sites);
+        siteRepository.flush();
+
+        log.info("Migrated sites: " + sites.size());
+    }
+
+
+    public void migratePermits() {
     }
 }
