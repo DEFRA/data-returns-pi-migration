@@ -1,7 +1,7 @@
 package migration;
 
 import lombok.extern.slf4j.Slf4j;
-import migration.migration.DataMigration;
+import migration.migration.PermitMigration;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.ConfigurableApplicationContext;
@@ -19,12 +19,9 @@ public class App {
         if (context.getEnvironment().acceptsProfiles("migration")) {
             log.info("Running data-returns migration");
             try {
-                final DataMigration migration = context.getBean(DataMigration.class);
-                migration.migrateArea();
-                migration.migrateOperator();
-                migration.migrateAsr();
-                migration.migrateSite();
-                migration.migratePermits();
+                final PermitMigration permitMigration = context.getBean(PermitMigration.class);
+                permitMigration.migrate();
+
             } catch (final Throwable t) {
                 StringWriter sw = new StringWriter();
                 t.printStackTrace(new PrintWriter(sw));

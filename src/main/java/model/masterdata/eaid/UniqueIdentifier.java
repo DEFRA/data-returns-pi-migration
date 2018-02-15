@@ -5,6 +5,7 @@ import lombok.Setter;
 import model.masterdata.AbstractAliasedEntity;
 import model.masterdata.AbstractBaseEntity;
 import model.masterdata.AliasedEntity;
+import model.masterdata.geography.Area;
 import model.masterdata.site.Site;
 import org.hibernate.annotations.GenericGenerator;
 import org.hibernate.id.enhanced.SequenceStyleGenerator;
@@ -34,11 +35,20 @@ public class UniqueIdentifier extends AbstractAliasedEntity<UniqueIdentifierAlia
         EPRTR
     }
 
-    @ManyToOne(cascade = CascadeType.ALL, optional = false)
+    @ManyToOne(optional = false)
     private Site site;
 
     @Column
     @Enumerated(EnumType.STRING)
     private Type type;
+
+    @ManyToOne
+    private Operator operator;
+
+    @ManyToOne
+    private Area area;
+
+    @ManyToOne
+    private AsrCode asrCode;
 
 }

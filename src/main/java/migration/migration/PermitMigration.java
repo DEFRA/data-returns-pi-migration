@@ -18,7 +18,9 @@ import org.springframework.util.StringUtils;
 
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -27,22 +29,25 @@ import java.util.stream.Collectors;
 @Profile("migration")
 @Slf4j
 @RequiredArgsConstructor
-public class DataMigration {
+public class PermitMigration {
 
-    @Autowired IsrRegionEntityRepository isrRegionEntityRepository;
-    @Autowired IsrAreaEntityRepository isrAreaEntityRepository;
-    @Autowired IsrOperatorEntityRepository isrOperatorEntityRepository;
-    @Autowired IsrAsrCodesEntityRepository isrAsrCodesEntityRepository;
-    @Autowired IsrAsrFullCodesEntityRepository isrAsrFullCodesEntityRepository;
-    @Autowired IsrSiteEntityRepository isrSiteEntityRepository;
+    private final IsrRegionEntityRepository isrRegionEntityRepository;
+    private final IsrAreaEntityRepository isrAreaEntityRepository;
+    private final IsrOperatorEntityRepository isrOperatorEntityRepository;
+    private final IsrAsrCodesEntityRepository isrAsrCodesEntityRepository;
+    private final IsrAsrFullCodesEntityRepository isrAsrFullCodesEntityRepository;
+    private final IsrSiteEntityRepository isrSiteEntityRepository;
+    private final IsrAuthorisationEntityRepository isrAuthorisationEntityRepository;
+    private final IsrAuthorisationTypeEntityRepository isrAuthorisationTypeEntityRepository;
 
-    @Autowired AreaRepository areaRepository;
-    @Autowired RegionRepository regionRepository;
-    @Autowired OperatorRepository operatorRepository;
-    @Autowired AsrCodeRepository asrCodeRepository;
-    @Autowired SiteRepository siteRepository;
-    @Autowired UniqueIdentifierRepository uniqueIdentifierRepository;
-    @Autowired UniqueIdentifierGroupRepository uniqueIdentifierGroupRepository;
+    private final AreaRepository areaRepository;
+    private final RegionRepository regionRepository;
+    private final OperatorRepository operatorRepository;
+    private final AsrCodeRepository asrCodeRepository;
+    private final SiteRepository siteRepository;
+    private final UniqueIdentifierRepository uniqueIdentifierRepository;
+    private final UniqueIdentifierAliasRepository uniqueIdentifierAliasRepository;
+    private final UniqueIdentifierGroupRepository uniqueIdentifierGroupRepository;
 
     private Date timestamp = new Date();
 
@@ -50,7 +55,15 @@ public class DataMigration {
         return StringUtils.trimWhitespace(s.toUpperCase()).replaceAll("\\s+", " ");
     }
 
-    public void migrateArea() {
+    public void migrate() {
+        migrateArea();
+        migrateOperator();
+        migrateAsr();
+        migrateSite();
+        migratePermits();
+    }
+
+    private void migrateArea() {
         areaRepository.deleteAll();
         regionRepository.deleteAll();
 
@@ -97,7 +110,7 @@ public class DataMigration {
         areaRepository.flush();
     }
 
-    public void migrateOperator() {
+    private void migrateOperator() {
         operatorRepository.deleteAll();
         List<IsrOperatorEntity> isrOperatorEntities = isrOperatorEntityRepository.findAll();
 
@@ -118,7 +131,7 @@ public class DataMigration {
         log.info("Migrated operators: " + operators.size());
     }
 
-    public void migrateAsr() {
+    private void migrateAsr() {
         final List<IsrAsrFullCodesEntity> asrFullCodesEntities = isrAsrFullCodesEntityRepository.findAll();
 
         List<AsrCode> asrCodes = asrFullCodesEntities.stream().map(isrAsrFullCodesEntity -> {
@@ -140,7 +153,7 @@ public class DataMigration {
         log.info("Migrated ASR codes: " + asrCodes.size());
     }
 
-    public void migrateSite() {
+    private void migrateSite() {
         List<Site> currentSites = siteRepository.findAll();
 
         Set<String> currentSitesSet = currentSites.stream()
@@ -171,6 +184,71 @@ public class DataMigration {
     }
 
 
-    public void migratePermits() {
+    private void migratePermits() {
+        List<IsrAuthorisationEntity> authorisations = isrAuthorisationEntityRepository.findAll();
+
+        List<IsrAuthorisationEntity> newPermits = authorisations.stream()
+                .filter(isrAuthorisationEntity ->
+                        uniqueIdentifierRepository.getByNomenclature(isrAuthorisationEntity.getAuthorisationid()) == null)
+                .filter(isrAuthorisationEntity ->
+                        uniqueIdentifierAliasRepository.getByNomenclature(isrAuthorisationEntity.getAuthorisationid()) == null)
+                .collect(Collectors.toList());
+
+        List<IsrAuthorisationEntity> existsAsPrimary = authorisations.stream()
+                .filter(isrAuthorisationEntity ->
+                        uniqueIdentifierRepository.getByNomenclature(isrAuthorisationEntity.getAuthorisationid()) != null)
+                .collect(Collectors.toList());
+
+        List<IsrAuthorisationEntity> existsAsAlias = authorisations.stream()
+                .filter(isrAuthorisationEntity ->
+                        uniqueIdentifierAliasRepository.getByNomenclature(isrAuthorisationEntity.getAuthorisationid()) != null)
+                .collect(Collectors.toList());
+
+        log.info("PI-DEC permits which are new permits: " + newPermits.size());
+        log.info("PI-DEC permits with existing base permits: " + existsAsPrimary.size());
+        log.info("PI-DEC permits with existing alias permits: " + existsAsAlias.size());
+
+        // Process the new permits
+        List<UniqueIdentifier> uniqueIdentifiers = newPermits
+                .stream()
+                .filter(isrAuthorisationEntity -> isrAuthorisationEntity.getIsrSiteBySiteid() != null &&
+                        !Strings.isNullOrEmpty(isrAuthorisationEntity.getIsrSiteBySiteid().getSiteaddress()))
+                .map(s -> {
+                    UniqueIdentifier uniqueIdentifier = new UniqueIdentifier();
+                    uniqueIdentifier.setNomenclature(s.getAuthorisationid());
+
+                    if (s.getIsrAsrFullCodesByAsrFullCode() != null) {
+                        AsrCode asrCode = asrCodeRepository.getByNomenclature(s.getIsrAsrFullCodesByAsrFullCode().getAsrFullCode());
+                        uniqueIdentifier.setAsrCode(asrCode);
+                    }
+
+                    if (s.getIsrOperatorByOperatorid() != null) {
+                        Operator operator = operatorRepository.getByNomenclature(normalize(s.getIsrOperatorByOperatorid().getOperatorname()));
+                        uniqueIdentifier.setOperator(operator);
+                    }
+
+                    if (s.getIsrAreaByAgencyareaid() != null) {
+                        Area area = areaRepository.getByNomenclature(s.getIsrAreaByAgencyareaid().getAreaname());
+                        uniqueIdentifier.setArea(area);
+                    }
+
+                    if (s.getIsrAuthorisationtypeByAuthorisationtypeid() != null) {
+                        String type = s.getIsrAuthorisationtypeByAuthorisationtypeid().getAuthorisationtypename();
+                        uniqueIdentifier.setType(UniqueIdentifier.Type.valueOf(type));
+                    }
+
+                    Site site = siteRepository.getByNomenclature(normalize(s.getIsrSiteBySiteid().getSiteaddress()));
+                    uniqueIdentifier.setSite(site);
+                    uniqueIdentifier.setCreated(timestamp);
+                    uniqueIdentifier.setLastModified(timestamp);
+
+                    return uniqueIdentifier;
+        }).collect(Collectors.toList());
+
+        uniqueIdentifierRepository.save(uniqueIdentifiers);
+        uniqueIdentifierRepository.flush();
+
+        log.info("Migrated permits: " + uniqueIdentifiers.size());
     }
+
 }
