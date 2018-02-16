@@ -190,6 +190,20 @@ public class PermitMigration {
 
         log.info("PI-DEC permits which are new permits: " + newPermits.size());
 
+        List<IsrAuthorisationEntity> existsAsPrimary = authorisations.stream()
+                .filter(isrAuthorisationEntity ->
+                        uniqueIdentifierRepository.getByNomenclature(isrAuthorisationEntity.getAuthorisationid()) != null)
+                .collect(Collectors.toList());
+
+        log.info("PI-DEC permits with existing base permits: " + existsAsPrimary.size());
+
+        List<IsrAuthorisationEntity> existsAsAlias = authorisations.stream()
+                .filter(isrAuthorisationEntity ->
+                        uniqueIdentifierAliasRepository.getByNomenclature(isrAuthorisationEntity.getAuthorisationid()) != null)
+                .collect(Collectors.toList());
+
+        log.info("PI-DEC permits existing as aliases: " + existsAsAlias.size());
+
         // Make some caches
         Map<String, Area> areas = areaRepository.findAll().stream().collect(Collectors.toMap(Area::getNomenclature, Function.identity()));
         Map<String, Site> sites = siteRepository.findAll().stream().collect(Collectors.toMap(Site::getNomenclature, Function.identity()));
@@ -197,6 +211,7 @@ public class PermitMigration {
         Map<String, Operator> operators = operatorRepository.findAll().stream().collect(Collectors.toMap(Operator::getNomenclature, Function.identity()));
 
         // Process the new permits
+        log.info("Migrated new permits...");
         List<UniqueIdentifier> uniqueIdentifiers = newPermits
                 .stream()
                 .filter(isrAuthorisationEntity -> isrAuthorisationEntity.getIsrSiteBySiteid() != null &&
@@ -237,14 +252,7 @@ public class PermitMigration {
         uniqueIdentifierRepository.flush();
 
         log.info("Migrated new permits: " + uniqueIdentifiers.size());
-
-        List<IsrAuthorisationEntity> existsAsPrimary = authorisations.stream()
-                .filter(isrAuthorisationEntity ->
-                        uniqueIdentifierRepository.getByNomenclature(isrAuthorisationEntity.getAuthorisationid()) != null)
-                .collect(Collectors.toList());
-
-        log.info("PI-DEC permits with existing base permits: " + existsAsPrimary.size());
-
+        log.info("Migrating existing permits...");
         // Existing permits
         List<UniqueIdentifier> uniqueIdentifiersForUpdate = existsAsPrimary
                 .stream()
@@ -279,15 +287,8 @@ public class PermitMigration {
         uniqueIdentifierRepository.save(uniqueIdentifiersForUpdate);
         uniqueIdentifierRepository.flush();
 
-        log.info("Migrated existing permits: " + uniqueIdentifiersForUpdate.size());
-
-        List<IsrAuthorisationEntity> existsAsAlias = authorisations.stream()
-                .filter(isrAuthorisationEntity ->
-                        uniqueIdentifierAliasRepository.getByNomenclature(isrAuthorisationEntity.getAuthorisationid()) != null)
-                .collect(Collectors.toList());
-
-        log.info("PI-DEC permits existing as aliases: " + existsAsAlias.size());
-
+        log.info("Migrated existing permits... " + uniqueIdentifiersForUpdate.size());
+        log.info("Migrating aliases...");
         // Existing alias
         List<UniqueIdentifier> uniqueIdentifiers2ForUpdate = existsAsAlias
                 .stream()
@@ -322,7 +323,7 @@ public class PermitMigration {
 
         uniqueIdentifierRepository.save(uniqueIdentifiers2ForUpdate);
         uniqueIdentifierRepository.flush();
-        log.info("Migrated existing permits: " + uniqueIdentifiers2ForUpdate.size());
+        log.info("Migrated aliases: " + uniqueIdentifiers2ForUpdate.size());
 
         UniqueIdentifierGroup piGroup = uniqueIdentifierGroupRepository.getByNomenclature("PI");
         Set<UniqueIdentifier> piIds = new HashSet<>(uniqueIdentifiers);
