@@ -22,9 +22,9 @@ spring:
 
   pidec:
     datasource:
-       url: jdbc:postgresql://localhost:5432/piedc?currentSchema=pidec
-       username: data_returns_owner
-       password: data_returns_owner
+       url: jdbc:postgresql://poimaster.cqcu8oshua9i.eu-west-1.rds.amazonaws.com:5432/pidec?currentSchema=pidec
+       username: poimaster
+       password: poimaster
        driverClassName: org.postgresql.Driver
 
   jpa:

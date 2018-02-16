@@ -11,18 +11,12 @@ import model.masterdata.geography.RegionRepository;
 import model.masterdata.site.Site;
 import model.masterdata.site.SiteRepository;
 import model.pidec.authorizations.*;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.function.Function;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Service
@@ -194,19 +188,13 @@ public class PermitMigration {
                         uniqueIdentifierAliasRepository.getByNomenclature(isrAuthorisationEntity.getAuthorisationid()) == null)
                 .collect(Collectors.toList());
 
-        List<IsrAuthorisationEntity> existsAsPrimary = authorisations.stream()
-                .filter(isrAuthorisationEntity ->
-                        uniqueIdentifierRepository.getByNomenclature(isrAuthorisationEntity.getAuthorisationid()) != null)
-                .collect(Collectors.toList());
-
-        List<IsrAuthorisationEntity> existsAsAlias = authorisations.stream()
-                .filter(isrAuthorisationEntity ->
-                        uniqueIdentifierAliasRepository.getByNomenclature(isrAuthorisationEntity.getAuthorisationid()) != null)
-                .collect(Collectors.toList());
-
         log.info("PI-DEC permits which are new permits: " + newPermits.size());
-        log.info("PI-DEC permits with existing base permits: " + existsAsPrimary.size());
-        log.info("PI-DEC permits with existing alias permits: " + existsAsAlias.size());
+
+        // Make some caches
+        Map<String, Area> areas = areaRepository.findAll().stream().collect(Collectors.toMap(Area::getNomenclature, Function.identity()));
+        Map<String, Site> sites = siteRepository.findAll().stream().collect(Collectors.toMap(Site::getNomenclature, Function.identity()));
+        Map<String, AsrCode> asrCodes = asrCodeRepository.findAll().stream().collect(Collectors.toMap(AsrCode::getNomenclature, Function.identity()));
+        Map<String, Operator> operators = operatorRepository.findAll().stream().collect(Collectors.toMap(Operator::getNomenclature, Function.identity()));
 
         // Process the new permits
         List<UniqueIdentifier> uniqueIdentifiers = newPermits
@@ -218,17 +206,17 @@ public class PermitMigration {
                     uniqueIdentifier.setNomenclature(s.getAuthorisationid());
 
                     if (s.getIsrAsrFullCodesByAsrFullCode() != null) {
-                        AsrCode asrCode = asrCodeRepository.getByNomenclature(s.getIsrAsrFullCodesByAsrFullCode().getAsrFullCode());
+                        AsrCode asrCode = asrCodes.get(s.getIsrAsrFullCodesByAsrFullCode().getAsrFullCode());
                         uniqueIdentifier.setAsrCode(asrCode);
                     }
 
                     if (s.getIsrOperatorByOperatorid() != null) {
-                        Operator operator = operatorRepository.getByNomenclature(normalize(s.getIsrOperatorByOperatorid().getOperatorname()));
+                        Operator operator = operators.get(normalize(s.getIsrOperatorByOperatorid().getOperatorname()));
                         uniqueIdentifier.setOperator(operator);
                     }
 
                     if (s.getIsrAreaByAgencyareaid() != null) {
-                        Area area = areaRepository.getByNomenclature(s.getIsrAreaByAgencyareaid().getAreaname());
+                        Area area = areas.get(s.getIsrAreaByAgencyareaid().getAreaname());
                         uniqueIdentifier.setArea(area);
                     }
 
@@ -237,18 +225,112 @@ public class PermitMigration {
                         uniqueIdentifier.setType(UniqueIdentifier.Type.valueOf(type));
                     }
 
-                    Site site = siteRepository.getByNomenclature(normalize(s.getIsrSiteBySiteid().getSiteaddress()));
+                    Site site = sites.get(normalize(s.getIsrSiteBySiteid().getSiteaddress()));
                     uniqueIdentifier.setSite(site);
                     uniqueIdentifier.setCreated(timestamp);
                     uniqueIdentifier.setLastModified(timestamp);
 
                     return uniqueIdentifier;
-        }).collect(Collectors.toList());
+                }).collect(Collectors.toList());
 
         uniqueIdentifierRepository.save(uniqueIdentifiers);
         uniqueIdentifierRepository.flush();
 
-        log.info("Migrated permits: " + uniqueIdentifiers.size());
-    }
+        log.info("Migrated new permits: " + uniqueIdentifiers.size());
 
+        List<IsrAuthorisationEntity> existsAsPrimary = authorisations.stream()
+                .filter(isrAuthorisationEntity ->
+                        uniqueIdentifierRepository.getByNomenclature(isrAuthorisationEntity.getAuthorisationid()) != null)
+                .collect(Collectors.toList());
+
+        log.info("PI-DEC permits with existing base permits: " + existsAsPrimary.size());
+
+        // Existing permits
+        List<UniqueIdentifier> uniqueIdentifiersForUpdate = existsAsPrimary
+                .stream()
+                .map(s -> {
+                    UniqueIdentifier uniqueIdentifier = uniqueIdentifierRepository.getByNomenclature(s.getAuthorisationid());
+
+                    if (s.getIsrAsrFullCodesByAsrFullCode() != null) {
+                        AsrCode asrCode = asrCodes.get(s.getIsrAsrFullCodesByAsrFullCode().getAsrFullCode());
+                        uniqueIdentifier.setAsrCode(asrCode);
+                    }
+
+                    if (s.getIsrOperatorByOperatorid() != null) {
+                        Operator operator = operators.get(normalize(s.getIsrOperatorByOperatorid().getOperatorname()));
+                        uniqueIdentifier.setOperator(operator);
+                    }
+
+                    if (s.getIsrAreaByAgencyareaid() != null) {
+                        Area area = areas.get(s.getIsrAreaByAgencyareaid().getAreaname());
+                        uniqueIdentifier.setArea(area);
+                    }
+
+                    if (s.getIsrAuthorisationtypeByAuthorisationtypeid() != null) {
+                        String type = s.getIsrAuthorisationtypeByAuthorisationtypeid().getAuthorisationtypename();
+                        uniqueIdentifier.setType(UniqueIdentifier.Type.valueOf(type));
+                    }
+
+                    uniqueIdentifier.setLastModified(timestamp);
+
+                    return uniqueIdentifier;
+                }).collect(Collectors.toList());
+
+        uniqueIdentifierRepository.save(uniqueIdentifiersForUpdate);
+        uniqueIdentifierRepository.flush();
+
+        log.info("Migrated existing permits: " + uniqueIdentifiersForUpdate.size());
+
+        List<IsrAuthorisationEntity> existsAsAlias = authorisations.stream()
+                .filter(isrAuthorisationEntity ->
+                        uniqueIdentifierAliasRepository.getByNomenclature(isrAuthorisationEntity.getAuthorisationid()) != null)
+                .collect(Collectors.toList());
+
+        log.info("PI-DEC permits existing as aliases: " + existsAsAlias.size());
+
+        // Existing alias
+        List<UniqueIdentifier> uniqueIdentifiers2ForUpdate = existsAsAlias
+                .stream()
+                .map(s -> {
+                    UniqueIdentifierAlias uniqueIdentifierAlias = uniqueIdentifierAliasRepository.getByNomenclature(s.getAuthorisationid());
+                    UniqueIdentifier uniqueIdentifier = uniqueIdentifierAlias.getPreferred();
+
+                    if (s.getIsrAsrFullCodesByAsrFullCode() != null) {
+                        AsrCode asrCode = asrCodes.get(s.getIsrAsrFullCodesByAsrFullCode().getAsrFullCode());
+                        uniqueIdentifier.setAsrCode(asrCode);
+                    }
+
+                    if (s.getIsrOperatorByOperatorid() != null) {
+                        Operator operator = operators.get(normalize(s.getIsrOperatorByOperatorid().getOperatorname()));
+                        uniqueIdentifier.setOperator(operator);
+                    }
+
+                    if (s.getIsrAreaByAgencyareaid() != null) {
+                        Area area = areas.get(s.getIsrAreaByAgencyareaid().getAreaname());
+                        uniqueIdentifier.setArea(area);
+                    }
+
+                    if (s.getIsrAuthorisationtypeByAuthorisationtypeid() != null) {
+                        String type = s.getIsrAuthorisationtypeByAuthorisationtypeid().getAuthorisationtypename();
+                        uniqueIdentifier.setType(UniqueIdentifier.Type.valueOf(type));
+                    }
+
+                    uniqueIdentifier.setLastModified(timestamp);
+
+                    return uniqueIdentifier;
+                }).collect(Collectors.toList());
+
+        uniqueIdentifierRepository.save(uniqueIdentifiers2ForUpdate);
+        uniqueIdentifierRepository.flush();
+        log.info("Migrated existing permits: " + uniqueIdentifiers2ForUpdate.size());
+
+        UniqueIdentifierGroup piGroup = uniqueIdentifierGroupRepository.getByNomenclature("PI");
+        Set<UniqueIdentifier> piIds = new HashSet<>(uniqueIdentifiers);
+        piIds.addAll(uniqueIdentifiersForUpdate);
+        piIds.addAll(uniqueIdentifiers2ForUpdate);
+        piGroup.setUniqueIdentifiers(piIds);
+        uniqueIdentifierGroupRepository.saveAndFlush(piGroup);
+        log.info("Created groups: " + piIds.size());
+
+    }
 }
