@@ -3,6 +3,7 @@ package migration.migration;
 import com.google.common.base.Strings;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import model.masterdata.Context;
 import model.masterdata.eaid.*;
 import model.masterdata.geography.Area;
 import model.masterdata.geography.AreaRepository;
@@ -11,11 +12,16 @@ import model.masterdata.geography.RegionRepository;
 import model.masterdata.site.Site;
 import model.masterdata.site.SiteRepository;
 import model.pidec.authorizations.*;
+import model.masterdata.regime.Regime;
+import model.masterdata.regime.RegimeRepository;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
-import java.util.*;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -41,7 +47,7 @@ public class PermitMigration {
     private final SiteRepository siteRepository;
     private final UniqueIdentifierRepository uniqueIdentifierRepository;
     private final UniqueIdentifierAliasRepository uniqueIdentifierAliasRepository;
-    private final UniqueIdentifierGroupRepository uniqueIdentifierGroupRepository;
+    private final RegimeRepository  regimeRepository;
 
     private Date timestamp = new Date();
 
@@ -210,6 +216,28 @@ public class PermitMigration {
         Map<String, AsrCode> asrCodes = asrCodeRepository.findAll().stream().collect(Collectors.toMap(AsrCode::getNomenclature, Function.identity()));
         Map<String, Operator> operators = operatorRepository.findAll().stream().collect(Collectors.toMap(Operator::getNomenclature, Function.identity()));
 
+        /*
+        2	Pollution Inventory reporting
+        3	Pollution Inventory reporting for intensive agriculture and landfill operators
+        4	Pollution Inventory reporting for EPRTR
+        5	Pollution Inventory reporting for radioactive waste
+         */
+
+        /*
+        1;"IPC"
+        2;"RAS"
+        3;"IPPC"
+        4;"WML"
+        5;"WIA"
+        6;"EPRTR"
+        ;""
+        */
+
+        Regime pi = regimeRepository.getOne(2L);
+        Regime farm = regimeRepository.getOne(2L);
+        Regime eprtr = regimeRepository.getOne(2L);
+        Regime rsr = regimeRepository.getOne(2L);
+
         // Process the new permits
         log.info("Migrated new permits...");
         List<UniqueIdentifier> uniqueIdentifiers = newPermits
@@ -237,7 +265,21 @@ public class PermitMigration {
 
                     if (s.getIsrAuthorisationtypeByAuthorisationtypeid() != null) {
                         String type = s.getIsrAuthorisationtypeByAuthorisationtypeid().getAuthorisationtypename();
-                        uniqueIdentifier.setType(UniqueIdentifier.Type.valueOf(type));
+                        switch (type) {
+                            case "IPC":
+                            case "IPPC":
+                            case "WML":
+                            case "WIA":
+                                uniqueIdentifier.getRegime().put(Context.PI, pi);
+                                break;
+                            case "EPRTR":
+                                uniqueIdentifier.getRegime().put(Context.PI, eprtr);
+                                break;
+                            case "RAS":
+                                uniqueIdentifier.getRegime().put(Context.PI, rsr);
+                                break;
+                        }
+
                     }
 
                     Site site = sites.get(normalize(s.getIsrSiteBySiteid().getSiteaddress()));
@@ -276,7 +318,20 @@ public class PermitMigration {
 
                     if (s.getIsrAuthorisationtypeByAuthorisationtypeid() != null) {
                         String type = s.getIsrAuthorisationtypeByAuthorisationtypeid().getAuthorisationtypename();
-                        uniqueIdentifier.setType(UniqueIdentifier.Type.valueOf(type));
+                        switch (type) {
+                            case "IPC":
+                            case "IPPC":
+                            case "WML":
+                            case "WIA":
+                                uniqueIdentifier.getRegime().put(Context.PI, pi);
+                                break;
+                            case "EPRTR":
+                                uniqueIdentifier.getRegime().put(Context.PI, eprtr);
+                                break;
+                            case "RAS":
+                                uniqueIdentifier.getRegime().put(Context.PI, rsr);
+                                break;
+                        }
                     }
 
                     uniqueIdentifier.setLastModified(timestamp);
@@ -313,7 +368,20 @@ public class PermitMigration {
 
                     if (s.getIsrAuthorisationtypeByAuthorisationtypeid() != null) {
                         String type = s.getIsrAuthorisationtypeByAuthorisationtypeid().getAuthorisationtypename();
-                        uniqueIdentifier.setType(UniqueIdentifier.Type.valueOf(type));
+                        switch (type) {
+                            case "IPC":
+                            case "IPPC":
+                            case "WML":
+                            case "WIA":
+                                uniqueIdentifier.getRegime().put(Context.PI, pi);
+                                break;
+                            case "EPRTR":
+                                uniqueIdentifier.getRegime().put(Context.PI, eprtr);
+                                break;
+                            case "RAS":
+                                uniqueIdentifier.getRegime().put(Context.PI, rsr);
+                                break;
+                        }
                     }
 
                     uniqueIdentifier.setLastModified(timestamp);
@@ -324,14 +392,5 @@ public class PermitMigration {
         uniqueIdentifierRepository.save(uniqueIdentifiers2ForUpdate);
         uniqueIdentifierRepository.flush();
         log.info("Migrated aliases: " + uniqueIdentifiers2ForUpdate.size());
-
-        UniqueIdentifierGroup piGroup = uniqueIdentifierGroupRepository.getByNomenclature("PI");
-        Set<UniqueIdentifier> piIds = new HashSet<>(uniqueIdentifiers);
-        piIds.addAll(uniqueIdentifiersForUpdate);
-        piIds.addAll(uniqueIdentifiers2ForUpdate);
-        piGroup.setUniqueIdentifiers(piIds);
-        uniqueIdentifierGroupRepository.saveAndFlush(piGroup);
-        log.info("Created groups: " + piIds.size());
-
     }
 }
