@@ -234,9 +234,9 @@ public class PermitMigration {
         */
 
         Regime pi = regimeRepository.getOne(2L);
-        Regime farm = regimeRepository.getOne(2L);
-        Regime eprtr = regimeRepository.getOne(2L);
-        Regime rsr = regimeRepository.getOne(2L);
+        Regime farm = regimeRepository.getOne(3L);
+        Regime eprtr = regimeRepository.getOne(4L);
+        Regime rsr = regimeRepository.getOne(5L);
 
         // Process the new permits
         log.info("Migrated new permits...");
